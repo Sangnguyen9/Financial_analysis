@@ -11,7 +11,6 @@ The goal is to identify high-performing regions, optimize human capital, and imp
 
 Financial_analysis_project/  
 │── **Financial_analysis.pbix**: Power BI dashboard containing all visualizations and insights  
-
 │── **SQL Programming** 
 
      1. Understand the Business Logic: Research the business domain and list all related terminology to fully understand the data inputs and expected outputs.
