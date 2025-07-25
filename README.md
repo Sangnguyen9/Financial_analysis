@@ -4,16 +4,15 @@
 
 ## 📌 Mục tiêu  
 
-Phân tích hiệu suất kinh doanh theo vùng, hiệu quả sử dụng nguồn lực và vốn thông qua lập trình SQL và trực quan hóa BI bằng dữ liệu tài chính và vận hành nội bộ.
-Mục tiêu là xác định các vùng hoạt động hiệu quả, tối ưu hóa nguồn nhân lực và cải thiện chiến lược phân bổ vốn để tăng lợi nhuận dài hạn.
+Phân tích hiệu suất kinh doanh theo vùng, hiệu quả sử dụng nguồn lực và vốn thông qua ngôn ngữ lập trình SQL và sử dụng Power BI để trực quan hóa  dữ liệu tài chính và vận hành nội bộ. Mục tiêu là xác định các vùng hoạt động hiệu quả, tối ưu hóa nguồn nhân lực và cải thiện chiến lược phân bổ vốn để tăng lợi nhuận dài hạn.
 
 ## 📁 Cấu trúc Dự án
 
-Financial_analysis_project/  
+Dự án Phân tích Tài chính/  
 │── **Financial_analysis.pbix**: Power BI dashboard containing all visualizations and insights  
 │── **SQL Programming** 
 
-    1. Hiểu Logic Nghiệp vụ: Nghiên cứu lĩnh vực kinh doanh và liệt kê tất cả thuật ngữ liên quan để hiểu rõ dữ liệu đầu vào và đầu ra mong đợi.
+ 1. Hiểu Logic Nghiệp vụ: Nghiên cứu lĩnh vực kinh doanh và liệt kê tất cả thuật ngữ liên quan để hiểu rõ dữ liệu đầu vào và đầu ra mong đợi.
  
  2. Thiết kế Bảng DIM Cơ cấu Vốn: Xây dựng bảng chiều (DIM) để lưu trữ tiêu chí cơ cấu vốn.
  
