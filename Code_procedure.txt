@@ -1,0 +1,961 @@
+CREATE OR REPLACE PROCEDURE baicuoikhoa.fact_summary_report_fin_monthly_prc(pMonth_key int DEFAULT NULL)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE 
+    vmonth_key INT;
+    vyear INT;
+    vmonth INT;
+    vstart_date DATE;
+    vend_date DATE;
+BEGIN
+    -- Set the month key parameter
+    IF (pMonth_key IS NULL) THEN
+        vmonth_key := to_char(current_date, 'YYYYMM')::int;
+    ELSE 
+        vmonth_key := pMonth_key;
+    END IF;
+    
+    -- Extract year and month from month_key for easier date handling
+    vyear := vmonth_key / 100;
+    vmonth := vmonth_key % 100;
+    vstart_date := make_date(vyear, vmonth, 1);
+    vend_date := (vstart_date + INTERVAL '1 month' - INTERVAL '1 day')::date;
+    
+    /* CHI TIEU LAI TRONG HAN */
+    
+    -- Step 1: Load data for "lai trong han" into temp table
+    TRUNCATE TABLE tmp_laitronghan_chua_phan_bo;
+    
+    INSERT INTO tmp_laitronghan_chua_phan_bo (month_key, area_code, amount)
+    -- Lai trong han chua phan bo DVML
+    SELECT 
+        vmonth_key AS month_key, 
+        substring(analysis_code, 9, 1) AS area_code, 
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (702000030002, 702000030001, 702000030112) 
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- Lai trong han chua phan bo head
+    SELECT 
+        vmonth_key AS month_key, 
+        'HEAD' AS area_code, 
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (702000030002, 702000030001, 702000030112) 
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date;
+    
+    -- Step 2: Calculate avg outstanding after write-off for group 1 by area and total
+    TRUNCATE TABLE baicuoikhoa.tmp_dnck_after_wo;
+    
+    INSERT INTO baicuoikhoa.tmp_dnck_after_wo
+    (month_key, area_code, avg_dbgroup_1, avg_dbgroup_2, avg_dbgroup_345, avg_after_wo, avg_toanhang, sale_manager)
+    -- DNCK avg by area: after write-off 
+    SELECT  
+        vmonth_key AS kpi_month,
+        area_code,
+        avg(os_after_wo_1) AS avg_after_wo_1,
+        avg(os_after_wo_2) AS avg_after_wo_2,
+        avg(os_after_wo_345) AS avg_after_wo_345,
+        avg(dnck) AS avg_after_wo,
+        0 AS avg_toanhang,
+        CASE 
+            WHEN area_code = 'B' THEN 8
+            WHEN area_code = 'C' THEN 7
+            WHEN area_code = 'D' THEN 22
+            WHEN area_code = 'E' THEN 5
+            WHEN area_code = 'F' THEN 5
+            WHEN area_code = 'G' THEN 11
+            WHEN area_code = 'H' THEN 15
+            WHEN area_code = 'toanhang' THEN 73
+        END AS sale_manager
+    FROM (
+        SELECT 
+            y.area_code,
+            x.kpi_month,
+            sum(outstanding_principal) AS dnck,
+            sum(CASE WHEN coalesce(max_bucket, 1) = 1 THEN outstanding_principal ELSE 0 END) AS os_after_wo_1,
+            sum(CASE WHEN coalesce(max_bucket, 1) = 2 THEN outstanding_principal ELSE 0 END) AS os_after_wo_2,
+            sum(CASE WHEN coalesce(max_bucket, 1) IN (3,4,5) THEN outstanding_principal ELSE 0 END) AS os_after_wo_345
+        FROM fact_kpi_month_raw_data x 
+        JOIN dim_province y ON x.pos_city = y.pos_city
+        WHERE kpi_month = vmonth_key
+        GROUP BY x.kpi_month, y.area_code
+    ) x
+    GROUP BY area_code
+    
+    UNION 
+    
+    -- HEAD data
+    SELECT  
+        vmonth_key AS kpi_month,
+        'HEAD' AS area_code,
+        avg(os_after_wo_1) AS avg_after_wo_1,
+        avg(os_after_wo_2) AS avg_after_wo_2,
+        avg(os_after_wo_345) AS avg_after_wo_345,
+        avg(dnck) AS avg_after_wo,
+        0 AS avg_toanhang,
+        0 AS sale_manager
+    FROM (
+        SELECT 
+            'HEAD' AS area_code,
+            x.kpi_month,
+            sum(outstanding_principal) AS dnck,
+            sum(CASE WHEN coalesce(max_bucket, 1) = 1 THEN outstanding_principal ELSE 0 END) AS os_after_wo_1,
+            sum(CASE WHEN coalesce(max_bucket, 1) = 2 THEN outstanding_principal ELSE 0 END) AS os_after_wo_2,
+            sum(CASE WHEN coalesce(max_bucket, 1) IN (3,4,5) THEN outstanding_principal ELSE 0 END) AS os_after_wo_345
+        FROM fact_kpi_month_raw_data x 
+        JOIN dim_province y ON x.pos_city = y.pos_city
+        WHERE kpi_month = vmonth_key
+        GROUP BY x.kpi_month
+    ) x
+    GROUP BY area_code
+    
+    UNION ALL
+    
+    -- Total data
+    SELECT 
+        vmonth_key AS kpi_month,
+        'toanhang' AS area_code,
+        avg(dn_month) AS avg_after_wo_1,
+        avg(dn_month) AS avg_after_wo_2,
+        avg(dn_month) AS avg_after_wo_345,
+        avg(dn_month) AS avg_after_wo,
+        avg(dn_month) AS avg_toanhang,
+        73 AS sale_manager
+    FROM (
+        SELECT 
+            x.kpi_month,
+            sum(x.outstanding_principal) AS dn_month
+        FROM fact_kpi_month_raw_data x 
+        JOIN dim_province y ON x.pos_city = y.pos_city
+        WHERE kpi_month = vmonth_key
+        GROUP BY x.kpi_month
+    ) x;
+    
+    -- Step 3: Calculate allocated "lai trong han"
+    TRUNCATE TABLE tmp_laitronghan_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_laitronghan_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_dbgroup_1,
+        y.avg_dbgroup_1_head,
+        x.amount + (z.amount * y.avg_dbgroup_1 / y.avg_dbgroup_1_head) AS amount_da_phan_bo
+    FROM tmp_laitronghan_chua_phan_bo x 
+    JOIN tmp_laitronghan_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_dbgroup_1,
+            b.avg_dbgroup_1 AS avg_dbgroup_1_head
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'HEAD'
+        WHERE a.area_code <> 'HEAD'
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code <> 'HEAD';
+    
+    /* CHI TIEU LAI QUA HAN */
+    -- Step 1: Load data for "lai qua han" into temp table
+    TRUNCATE TABLE tmp_laiquahan_chua_phan_bo;
+    
+    INSERT INTO tmp_laiquahan_chua_phan_bo (month_key, area_code, amount)
+    -- Lai qua han DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS lai_qua_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (702000030012, 702000030112) 
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- Lai qua han HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS lai_qua_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (702000030012, 702000030112)
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date;
+    
+    -- Step 2: Calculate allocated "lai qua han"
+    TRUNCATE TABLE tmp_laiquahan_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_laiquahan_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_dbgroup_2,
+        y.avg_dbgroup_2_head,
+        x.amount + (z.amount * y.avg_dbgroup_2 / y.avg_dbgroup_2_head) AS amount_da_phan_bo
+    FROM tmp_laiquahan_chua_phan_bo x 
+    JOIN tmp_laiquahan_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_dbgroup_2,
+            b.avg_dbgroup_2 AS avg_dbgroup_2_head
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'HEAD'
+        WHERE a.area_code <> 'HEAD'
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code <> 'HEAD';
+    
+    /* CHI TIEU PHI BAO HIEM */
+    -- Step 1: Load data for "phi bao hiem" into temp table
+    TRUNCATE TABLE tmp_phibaohiem_chua_phan_bo;
+    
+    INSERT INTO tmp_phibaohiem_chua_phan_bo (month_key, area_code, amount)
+    -- Phi bao hiem DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS phi_bao_hiem
+    FROM fact_txn_month_raw_data 
+    WHERE account_code = 716000000001
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- Phi bao hiem HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS phi_bao_hiem
+    FROM fact_txn_month_raw_data 
+    WHERE account_code = 716000000001
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Load PSDN data for phi bao hiem
+    TRUNCATE TABLE baicuoikhoa.psdn_phibaohiem;
+    
+    INSERT INTO baicuoikhoa.psdn_phibaohiem (area_code, month_key, psdn)
+    -- PSDN by area
+    SELECT 
+        y.area_code,
+        vmonth_key AS month_key,
+        sum(psdn) AS psdn_khuvuc
+    FROM fact_kpi_month_raw_data x 
+    JOIN dim_province y ON x.pos_city = y.pos_city
+    WHERE kpi_month = vmonth_key
+    GROUP BY y.area_code
+    
+    UNION ALL
+    
+    -- PSDN total
+    SELECT 
+        'toan_hang' AS area_code,
+        vmonth_key AS month_key,
+        sum(psdn) AS psdn_toanhang
+    FROM fact_kpi_month_raw_data;
+    
+    -- Calculate allocated phi bao hiem
+    TRUNCATE TABLE tmp_phibaohiem_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_phibaohiem_da_phan_bo
+    (month_key, area_code, amount_chua_phan_bo, amount_head, amount_da_phan_bo)
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        x.amount + (z.amount * y.psdn / y.psdn_toanhang) AS amount_da_phan_bo
+    FROM tmp_phibaohiem_chua_phan_bo x 
+    JOIN tmp_phibaohiem_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.psdn,
+            b.psdn AS psdn_toanhang
+        FROM psdn_phibaohiem a 
+        JOIN psdn_phibaohiem b ON b.area_code = 'toan_hang'
+        WHERE a.area_code <> 'toan_hang'
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('toan_hang');
+    
+    /* PHI TANG HAN MUC */
+    -- Step 1: Load data for "phi tang han muc" into temp table
+    TRUNCATE TABLE tmp_phitanghanmuc_chua_phan_bo;
+    
+    INSERT INTO tmp_phitanghanmuc_chua_phan_bo (month_key, area_code, amount)
+    -- Phi tang han muc DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code = 719000030002
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- Phi tang han muc HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code = 719000030002
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Step 2: Calculate allocated "phi tang han muc"
+    TRUNCATE TABLE tmp_phitanghanmuc_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_phitanghanmuc_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_dbgroup_1,
+        y.avg_dbgroup_1_head,
+        x.amount + (z.amount * y.avg_dbgroup_1 / y.avg_dbgroup_1_head) AS amount_da_phan_bo
+    FROM tmp_phitanghanmuc_chua_phan_bo x 
+    JOIN tmp_phitanghanmuc_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_dbgroup_1,
+            b.avg_dbgroup_1 AS avg_dbgroup_1_head
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'HEAD'
+        WHERE a.area_code <> 'HEAD'
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code <> 'HEAD';
+    
+    /* PHI THANH TOAN CHAM, THU TU NGOAI BANG */
+    -- Step 1: Load data for "phi khac" into temp table
+    TRUNCATE TABLE tmp_phikhac_chua_phan_bo;
+    
+    INSERT INTO tmp_phikhac_chua_phan_bo (month_key, area_code, amount)
+    -- Phi khac DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (719000030003, 719000030113, 790000030003, 790000030113, 790000030004, 790000030114)
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- Phi khac HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (719000030003, 719000030113, 790000030003, 790000030113, 790000030004, 790000030114)
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Step 2: Calculate allocated "phi khac"
+    TRUNCATE TABLE tmp_phikhac_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_phikhac_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_dbgroup_345,
+        y.avg_dbgroup_345_head,
+        x.amount + (z.amount * y.avg_dbgroup_345 / y.avg_dbgroup_345_head) AS amount_da_phan_bo
+    FROM tmp_phikhac_chua_phan_bo x 
+    JOIN tmp_phikhac_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_dbgroup_345,
+            b.avg_dbgroup_345 AS avg_dbgroup_345_head
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'HEAD'
+        WHERE a.area_code <> 'HEAD'
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code <> 'HEAD';
+    
+    /* CHI PHI THUAN KDV */
+    /* CP TT2 */
+    -- Step 1: Load data for "cptt2" into temp table
+    TRUNCATE TABLE tmp_cptt2_chua_phan_bo;
+    
+    INSERT INTO tmp_cptt2_chua_phan_bo (month_key, area_code, amount)
+    -- CP TT2 DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (801000000001, 802000000001)
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- CP TT2 HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS lai_trong_han
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (801000000001, 802000000001)
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated CP TT2
+    TRUNCATE TABLE tmp_cptt2_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_cptt2_da_phan_bo
+    SELECT 
+        a.month_key,
+        a.area_code,
+        a.avg_after_wo,
+        c.amount AS amount_head,
+        b.avg_toanhang AS avg_after_wo_toanhang,
+        c.amount AS amount_chua_phan_bo,
+        c.amount * (a.avg_after_wo / b.avg_toanhang) AS amount_da_phan_bo
+    FROM tmp_dnck_after_wo a 
+    JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+    JOIN tmp_cptt2_chua_phan_bo c ON b.month_key = c.month_key 
+    WHERE a.area_code <> 'toanhang';
+    
+    /* CP VON CCTG */
+    TRUNCATE TABLE tmp_cctg_chua_phan_bo;
+    
+    INSERT INTO tmp_cctg_chua_phan_bo (month_key, area_code, amount)
+    SELECT 
+        vmonth_key AS month_key,
+        dp.area_name,
+        sum(amount) AS amount
+    FROM fact_txn_month ftm 
+    LEFT JOIN dim_province dp ON ftm.area_code = dp.area_code 
+    WHERE account_code = 803000000001
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY dp.area_name;
+    
+    -- Calculate allocated CP CCTG
+    TRUNCATE TABLE tmp_cctg_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_cctg_da_phan_bo
+    SELECT 
+        a.month_key,
+        a.area_code,
+        a.avg_after_wo,
+        c.amount AS amount_head,
+        b.avg_toanhang AS avg_after_wo_toanhang,
+        c.amount AS amount_chua_phan_bo,
+        c.amount * (a.avg_after_wo / b.avg_toanhang) AS amount_da_phan_bo
+    FROM tmp_dnck_after_wo a 
+    JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+    JOIN tmp_cctg_chua_phan_bo c ON b.month_key = c.month_key 
+    WHERE a.area_code <> 'toanhang';
+    
+    /* DOANH THU KINH DOANH */
+    TRUNCATE TABLE tmp_dtkd_chua_phan_bo;
+    
+    INSERT INTO tmp_dtkd_chua_phan_bo
+    -- DT KD HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS dt_kinhdoanh_khuvuc
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (
+        '702000010001','702000010002','704000000001','705000000001','709000000001',
+        '714000000002','714000000003','714037000001','714000000004','714014000001',
+        '715000000001','715037000001','719000000001','709000000101','719000000101'
+    )
+    AND analysis_code LIKE 'HEAD%'
+    AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- DT KD DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS dt_kinhdoanh_khuvuc
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (
+        '702000010001','702000010002','704000000001','705000000001','709000000001',
+        '714000000002','714000000003','714037000001','714000000004','714014000001',
+        '715000000001','715037000001','719000000001','709000000101','719000000101'
+    )
+    AND analysis_code LIKE 'DVML%'
+    AND transaction_date BETWEEN vstart_date AND vend_date
+    AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated DT KD
+    TRUNCATE TABLE tmp_dtkd_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_dtkd_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_after_wo,
+        y.avg_toanhang,
+        x.amount + (z.amount * y.avg_after_wo / y.avg_toanhang) AS amount_da_phan_bo
+    FROM tmp_dtkd_chua_phan_bo x 
+    JOIN tmp_dtkd_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_after_wo,
+            b.avg_toanhang AS avg_toanhang
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+        WHERE a.area_code NOT IN ('HEAD', 'toanhang')
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('HEAD', 'toanhang');
+    
+    /* CHI PHI HOA HONG */
+    TRUNCATE TABLE tmp_chiphihoahong_chua_phan_bo;
+    
+    INSERT INTO tmp_chiphihoahong_chua_phan_bo (month_key, area_code, amount)
+    -- CP hoa hong HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS cp_hoahong
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN ('816000000001','816000000002','816000000003')
+      AND analysis_code LIKE 'HEAD%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY substring(analysis_code, 9, 1)
+    
+    UNION ALL
+    
+    -- CP hoa hong DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS cp_hoahong
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN ('816000000001','816000000002','816000000003')
+      AND analysis_code LIKE 'DVML%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated CP hoa hong
+    TRUNCATE TABLE tmp_chiphihoahong_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_chiphihoahong_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_after_wo,
+        y.avg_toanhang,
+        x.amount + (z.amount * y.avg_after_wo / y.avg_toanhang) AS amount_da_phan_bo
+    FROM tmp_chiphihoahong_chua_phan_bo x 
+    JOIN tmp_chiphihoahong_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_after_wo,
+            b.avg_toanhang AS avg_toanhang
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+        WHERE a.area_code NOT IN ('HEAD', 'toanhang')
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('HEAD', 'toanhang');
+    
+    /* CHI PHI THUAN KD KHAC */
+    TRUNCATE TABLE tmp_chiphithuankd_chua_phan_bo;
+    
+    INSERT INTO tmp_chiphithuankd_chua_phan_bo (month_key, area_code, amount)
+    -- CP thuan KD khac - HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount) AS laitronghan
+    FROM fact_txn_month ftm 
+    LEFT JOIN dim_province dp ON ftm.area_code = dp.area_code 
+    WHERE account_code IN (
+        '809000000002','809000000001','811000000001','811000000102','811000000002',
+        '811014000001','811037000001','811039000001','811041000001','815000000001',
+        '819000000002','819000000003','819000000001','790000000003','790000050101',
+        '790000000101','790037000001','849000000001','899000000003','899000000002',
+        '811000000101','819000060001'
+    )
+    AND analysis_code LIKE 'HEAD%'
+    AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY dp.area_code
+    
+    UNION ALL
+    
+    -- CP thuan KD khac DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount) AS cp_hoahong
+    FROM fact_txn_month_raw_data 
+    WHERE account_code IN (
+        '809000000002','809000000001','811000000001','811000000102','811000000002',
+        '811014000001','811037000001','811039000001','811041000001','815000000001',
+        '819000000002','819000000003','819000000001','790000000003','790000050101',
+        '790000000101','790037000001','849000000001','899000000003','899000000002',
+        '811000000101','819000060001'
+    )
+    AND analysis_code LIKE 'DVML%'
+    AND transaction_date BETWEEN vstart_date AND vend_date
+    AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated CP thuan KD khac
+    TRUNCATE TABLE tmp_chiphithuankd_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_chiphithuankd_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_after_wo,
+        y.avg_toanhang,
+        x.amount + (z.amount * y.avg_after_wo / y.avg_toanhang) AS amount_da_phan_bo
+    FROM tmp_chiphithuankd_chua_phan_bo x 
+    JOIN tmp_chiphithuankd_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_after_wo,
+            b.avg_toanhang AS avg_toanhang
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+        WHERE a.area_code NOT IN ('HEAD', 'toanhang')
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('HEAD', 'toanhang');
+    
+    /* CHI PHI NHAN VIEN */
+    TRUNCATE TABLE tmp_chiphinhanvien_chua_phan_bo;
+    
+    INSERT INTO tmp_chiphinhanvien_chua_phan_bo(month_key, area_code, amount)
+    -- CP nhan vien HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount)
+    FROM fact_txn_month ftm 
+    LEFT JOIN dim_province dp ON ftm.area_code = dp.area_code 
+    WHERE analysis_code LIKE 'HEAD%'
+      AND cast(account_code AS varchar) LIKE '85%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY dp.area_code
+    
+    UNION ALL
+    
+    -- CP nhan vien DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount)
+    FROM fact_txn_month_raw_data 
+    WHERE analysis_code LIKE 'DVML%'
+      AND cast(account_code AS varchar) LIKE '85%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated CP nhan vien
+    TRUNCATE TABLE tmp_chiphinhanvien_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_chiphinhanvien_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_after_wo,
+        y.avg_toanhang,
+        x.amount + (z.amount * y.sale_manager_area / y.sale_manager_toanhang) AS amount_da_phan_bo
+    FROM tmp_chiphinhanvien_chua_phan_bo x 
+    JOIN tmp_chiphinhanvien_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_after_wo,
+            b.avg_toanhang AS avg_toanhang,
+            a.sale_manager AS sale_manager_area,
+            b.sale_manager AS sale_manager_toanhang
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+        WHERE a.area_code NOT IN ('HEAD', 'toanhang')
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('HEAD', 'toanhang');
+    
+    /* CHI PHI QUAN LY */
+    TRUNCATE TABLE tmp_chiphiquanly_chua_phan_bo;
+    
+    INSERT INTO tmp_chiphiquanly_chua_phan_bo(month_key, area_code, amount)
+    -- CP quan ly HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount)
+    FROM fact_txn_month ftm 
+    LEFT JOIN dim_province dp ON ftm.area_code = dp.area_code 
+    WHERE analysis_code LIKE 'HEAD%'
+      AND cast(account_code AS varchar) LIKE '86%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY dp.area_code
+    
+    UNION ALL
+    
+    -- CP quan ly DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount)
+    FROM fact_txn_month_raw_data 
+    WHERE analysis_code LIKE 'DVML%'
+      AND cast(account_code AS varchar) LIKE '86%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated CP quan ly
+    TRUNCATE TABLE tmp_chiphiquanly_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_chiphiquanly_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_after_wo,
+        y.avg_toanhang,
+        x.amount + (z.amount * y.sale_manager_area / y.sale_manager_toanhang) AS amount_da_phan_bo
+    FROM tmp_chiphiquanly_chua_phan_bo x 
+    JOIN tmp_chiphiquanly_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_after_wo,
+            b.avg_toanhang AS avg_toanhang,
+            a.sale_manager AS sale_manager_area,
+            b.sale_manager AS sale_manager_toanhang
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+        WHERE a.area_code NOT IN ('HEAD', 'toanhang')
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('HEAD', 'toanhang');
+    
+    /* CHI PHI TAI SAN */
+    TRUNCATE TABLE tmp_chiphitaisan_chua_phan_bo;
+    
+    INSERT INTO tmp_chiphitaisan_chua_phan_bo(month_key, area_code, amount)
+    -- CP tai san HEAD
+    SELECT 
+        vmonth_key AS month_key,
+        'HEAD' AS area_code,
+        sum(amount)
+    FROM fact_txn_month ftm 
+    LEFT JOIN dim_province dp ON ftm.area_code = dp.area_code 
+    WHERE analysis_code LIKE 'HEAD%'
+      AND cast(account_code AS varchar) LIKE '87%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+    GROUP BY dp.area_code
+    
+    UNION ALL
+    
+    -- CP tai san DVML
+    SELECT 
+        vmonth_key AS month_key,
+        substring(analysis_code, 9, 1) AS area_code,
+        sum(amount)
+    FROM fact_txn_month_raw_data 
+    WHERE analysis_code LIKE 'DVML%'
+      AND cast(account_code AS varchar) LIKE '87%'
+      AND transaction_date BETWEEN vstart_date AND vend_date
+      AND substring(analysis_code, 9, 1) IN ('B','C','D','E','F','G','H')
+    GROUP BY substring(analysis_code, 9, 1);
+    
+    -- Calculate allocated CP tai san
+    TRUNCATE TABLE tmp_chiphitaisan_da_phan_bo;
+    
+    INSERT INTO baicuoikhoa.tmp_chiphitaisan_da_phan_bo
+    SELECT 
+        x.month_key,
+        x.area_code,
+        x.amount AS amount_chua_phan_bo,
+        z.amount AS amount_head,
+        y.avg_after_wo,
+        y.avg_toanhang,
+        x.amount + (z.amount * y.sale_manager_area / y.sale_manager_toanhang) AS amount_da_phan_bo
+    FROM tmp_chiphitaisan_chua_phan_bo x 
+    JOIN tmp_chiphitaisan_chua_phan_bo z ON z.area_code = 'HEAD'
+    LEFT JOIN (
+        SELECT 
+            a.month_key,
+            a.area_code,
+            a.avg_after_wo,
+            b.avg_toanhang AS avg_toanhang,
+            a.sale_manager AS sale_manager_area,
+            b.sale_manager AS sale_manager_toanhang
+        FROM tmp_dnck_after_wo a 
+        JOIN tmp_dnck_after_wo b ON b.area_code = 'toanhang'
+        WHERE a.area_code NOT IN ('HEAD', 'toanhang')
+    ) y ON x.month_key = y.month_key AND x.area_code = y.area_code 
+    WHERE x.area_code NOT IN ('HEAD', 'toanhang');
+    
+    -- Clear data before loading
+    TRUNCATE TABLE fact_summary_report_fin_monthly;
+    
+    -- Insert final data into the report table
+    INSERT INTO baicuoikhoa.fact_summary_report_fin_monthly
+    (report_id, month_key, head_amt, tnb_area_amt, ntb_area_amt, btb_area_amt, dbd_area_amt, tbb_area_amt, dnb_area_amt, dbsh_area_amt)
+    SELECT
+        id,
+        vmonth_key AS month_key,
+        ROUND(SUM(CASE WHEN h.area_code = 'HEAD' THEN h.amount_chua_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "HEAD",
+        ROUND(SUM(CASE WHEN h.area_code = 'B' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "Miền Tây Nam Bộ",
+        ROUND(SUM(CASE WHEN h.area_code = 'C' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "Nam Trung Bộ",
+        ROUND(SUM(CASE WHEN h.area_code = 'D' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "Bắc Trung Bộ",
+        ROUND(SUM(CASE WHEN h.area_code = 'E' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "Đông Bắc Bộ",
+        ROUND(SUM(CASE WHEN h.area_code = 'F' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "Tây Bắc Bộ",
+        ROUND(SUM(CASE WHEN h.area_code = 'G' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "Miền Đông Nam Bộ",
+        ROUND(SUM(CASE WHEN h.area_code = 'H' THEN h.amount_da_phan_bo / 1000000.0 ELSE 0 END)::numeric, 2) AS "ĐB Sông Hồng"
+    FROM (	
+        -- Lai trong han
+        SELECT 3 AS id, a.area_code, 'Lãi trong hạn' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_laitronghan_da_phan_bo a
+    
+        UNION ALL
+        -- Lai qua han
+        SELECT 4 AS id, a.area_code, 'Lãi qua han' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_laiquahan_da_phan_bo a
+        
+        UNION ALL
+        -- Phi bao hiem
+        SELECT 5 AS id, a.area_code, 'Phí bao hiem' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_phibaohiem_da_phan_bo a
+        
+        UNION ALL
+        -- Phi tang han muc
+        SELECT 6 AS id, a.area_code, 'Phí tăng hạn mức' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_phitanghanmuc_da_phan_bo a
+        
+        UNION ALL
+        -- Phi khac
+        SELECT 7 AS id, a.area_code, 'Phí khác' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_phikhac_da_phan_bo a
+        
+        UNION ALL
+        -- DT Nguon von
+        SELECT 9 AS id, '' AS area_code, 'DT Nguồn vốn' AS tieu_chi, 0 AS amount_da_phan_bo, 0 AS amount_chua_phan_bo
+        
+        UNION ALL
+        -- CP von TT 2
+        SELECT 10 AS id, a.area_code, 'CP vốn TT 2' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_cptt2_da_phan_bo a
+        
+        UNION ALL
+        -- CP von TT 1
+        SELECT 11 AS id, '' AS area_code, 'CP vốn TT 1' AS tieu_chi, 0 AS amount_da_phan_bo, 0 AS amount_chua_phan_bo
+        
+        UNION ALL
+        -- CP von CCTG
+        SELECT 12 AS id, a.area_code, 'CP vốn CCTG' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_cctg_da_phan_bo a
+        
+        UNION ALL
+        -- DT Fintech
+        SELECT 14 AS id, '' AS area_code, 'DT Fintech' AS tieu_chi, 0 AS amount_da_phan_bo, 0 AS amount_chua_phan_bo
+        
+        UNION ALL
+        -- DT tieu thuong, ca nhan
+        SELECT 15 AS id, '' AS area_code, 'DT tiểu thương, cá nhân' AS tieu_chi, 0 AS amount_da_phan_bo, 0 AS amount_chua_phan_bo
+        
+        UNION ALL
+        -- DT Kinh doanh
+        SELECT 13 AS id, a.area_code, 'DT Kinh doanh' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_dtkd_da_phan_bo a
+        
+        UNION ALL
+        -- CP hoa hong
+        SELECT 17 AS id, a.area_code, 'CP hoa hồng' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_chiphihoahong_da_phan_bo a
+        
+        UNION ALL
+        -- CP thuan KD khac
+        SELECT 18 AS id, a.area_code, 'CP thuần KD khác' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_chiphithuankd_da_phan_bo a
+        
+        UNION ALL
+        -- CP hop tac kd tau
+        SELECT 19 AS id, '' AS area_code, 'CP hợp tác kd tàu (net)' AS tieu_chi, 0 AS amount_da_phan_bo, 0 AS amount_chua_phan_bo
+        
+        UNION ALL
+        -- CP thue, phi
+        SELECT 22 AS id, '' AS area_code, 'CP thuế, phí' AS tieu_chi, 0 AS amount_da_phan_bo, 0 AS amount_chua_phan_bo
+        
+        UNION ALL
+        -- CP nhan vien
+        SELECT 23 AS id, a.area_code, 'CP nhân viên' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_chiphinhanvien_da_phan_bo a
+        
+        UNION ALL
+        -- CP quan ly
+        SELECT 24 AS id, a.area_code, 'CP quản lý' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_chiphiquanly_da_phan_bo a
+        
+        UNION ALL
+        -- CP tai san
+        SELECT 25 AS id, a.area_code, 'CP tài sản' AS tieu_chi, a.amount_da_phan_bo, a.amount_chua_phan_bo
+        FROM tmp_chiphitaisan_da_phan_bo a
+    ) AS h	
+    GROUP BY tieu_chi, id;
+END;
+$procedure$;
