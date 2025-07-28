@@ -2,16 +2,49 @@
 # 📌 Financial analysis
 **Power BI, SQL Programming, Data Visualization**  
 
-## 📌 Objective  
-
-Analyze regional business performance, resource efficiency, and capital usage through SQL programming and BI visualization using internal financial and operational data.
+## 📌 Overview
+## Objectives
+- Analyze regional business performance, resource efficiency, and capital usage through SQL programming and BI visualization using internal financial and operational data.
 The goal is to identify high-performing regions, optimize human capital, and improve capital allocation strategies for long-term profitability.
+- In addition, it also helps us assess the capabilities of employees in each region through the Area Sales Manager (ASM) to promote a culture of responsibility and continuous development among ASMs. By analyzing different aspects of financial performance across all network areas and ASM KPIs, we can gain insights to maintain performance and improve the capabilities of senior managers in the company
+  
+## Data Sources
+Data is collected from various departments at the headquarters, including Sales and Operations, Accounting and ASM records.
+
+-  File fact_txn_month_raw_data: Records the income and expenses incurred by the financial activities of the enterprise in the General Ledger.
+
+-  File fact_kpi_month_raw_data: Records the final balance of card activities at the end of each month.
+
+-  File fact_kpi_asm: raw data on ASM monthly sales performance.
+
+## Output
+The objective is to develop a comprehensive regional business performance analysis report and a thorough employee performance evaluation report. Furthermore, a dashboard will be established to facilitate the visualization and analysis of these insights, thereby enabling more effective data-driven decision-making and strategic planning.
 
 ## 📁 Project Structure  
 
 Financial_analysis_project/  
-│── **Financial_analysis.pbix**: Power BI dashboard containing all visualizations and insights  
 │── **SQL Programming** 
+
+**Data Processing: Dbeaver + Postgresql**
+- Use Dbeaver to import into the database
+  
+  File fact_txn_month_raw_data
+<img width="1443" height="615" alt="image" src="https://github.com/user-attachments/assets/328a7a07-5180-4645-978c-4c579ef34f79" />
+
+ File fact_kpi_month_raw_data
+<img width="1327" height="599" alt="image" src="https://github.com/user-attachments/assets/c0e759c3-2ec7-48fd-9b7a-7cd3a9871e78" />
+
+ File fact_kpi_asm
+ <img width="1191" height="882" alt="image" src="https://github.com/user-attachments/assets/dfef0ba1-131d-4c33-ac3c-9580d9f8645a" />
+
+ Create dimension tables by using PostgreSQL Data Definition Language (DDL)
+
+ Table dim_province: Information about cities in each zone area
+<img width="1474" height="615" alt="image" src="https://github.com/user-attachments/assets/d0ac8e9b-f1b2-4d53-a45e-8c8f00d4132d" />
+
+
+│── **Financial_analysis.pbix**: Power BI dashboard containing all visualizations and insights
+
 │── **Dataset/**: Processed data exported from File Excel for offline use  
 │── **README.md**: Project documentation  
 
