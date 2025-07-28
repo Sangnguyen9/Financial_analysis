@@ -27,13 +27,13 @@ Financial_analysis_project/
 **Data Processing: Dbeaver + Postgresql**
  ### 1️⃣ Use Dbeaver to import into the database
  
- File fact_txn_month_raw_data
+- File fact_txn_month_raw_data
 <img width="1443" height="615" alt="image" src="https://github.com/user-attachments/assets/328a7a07-5180-4645-978c-4c579ef34f79" />
 
-File fact_kpi_month_raw_data
+- File fact_kpi_month_raw_data
 <img width="1327" height="599" alt="image" src="https://github.com/user-attachments/assets/c0e759c3-2ec7-48fd-9b7a-7cd3a9871e78" />
 
-File fact_kpi_asm
+- File fact_kpi_asm
 <img width="1191" height="882" alt="image" src="https://github.com/user-attachments/assets/dfef0ba1-131d-4c33-ac3c-9580d9f8645a" />
 
 ### 2️⃣ Create dimension tables by using PostgreSQL Data Definition Language (DDL)
@@ -77,12 +77,8 @@ File fact_kpi_asm
 ### 7️⃣ Glossary
 - A glossary explaining terms, abbreviations, and codes used in the financial analysis system.
 - Assist users in understanding report content clearly and avoid confusion during data review and analysis.
-│── **Dataset/**: Processed data exported from File Excel for offline use  
-│── **README.md**: Project documentation  
-
 ---  
 
-## 📊 Key Contributions  
 
 
 ---  
