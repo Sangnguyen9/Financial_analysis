@@ -63,7 +63,7 @@ The objective is to develop a comprehensive regional business performance analys
 - The financial performance of each region based on various indicators (income, expenses, profit, etc.).
 - Compare performance across regions and support decision-making on strategy and resource allocation.
 
-<img width="1394" height="806" alt="image" src="https://github.com/user-attachments/assets/6993fb1c-c60a-4b0d-91c6-776d6a19847f" />
+<img width="1463" height="854" alt="image" src="https://github.com/user-attachments/assets/542bf60a-05e0-40f6-8b22-524e949760c7" />
 
 ### 3️⃣ KQKD Analysis 
 - Regional financial trends through indicators like profit, CIR, margin, and staff productivity.
