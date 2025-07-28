@@ -1,6 +1,4 @@
-# Financial_analysis
-# 📌 Financial analysis
-**Power BI, SQL Programming, Data Visualization**  
+#📌 SQLprogramming_project
 
 ## 📌 Overview
 ## Objectives
@@ -78,9 +76,6 @@ Financial_analysis_project/
 - A glossary explaining terms, abbreviations, and codes used in the financial analysis system.
 - Assist users in understanding report content clearly and avoid confusion during data review and analysis.
 ---  
-
-
-
 ---  
 
 ## 🛠️ Tools Used  
