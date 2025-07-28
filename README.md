@@ -55,30 +55,44 @@ The objective is to develop a comprehensive regional business performance analys
 
 ### 1️⃣ Introduction
 - Identified key customer segments and purchasing behavior.  
-- Analyzed regional sales performance to detect market trends.  
+- Analyzed regional sales performance to detect market trends.
+  
+<img width="1441" height="807" alt="image" src="https://github.com/user-attachments/assets/8706ac85-c176-4ea4-821d-2f59e5af79c1" />
 
 ### 2️⃣ KQKD by Area 
 - The financial performance of each region based on various indicators (income, expenses, profit, etc.).
 - Compare performance across regions and support decision-making on strategy and resource allocation.
 
+<img width="1394" height="806" alt="image" src="https://github.com/user-attachments/assets/6993fb1c-c60a-4b0d-91c6-776d6a19847f" />
+
 ### 3️⃣ KQKD Analysis 
 - Regional financial trends through indicators like profit, CIR, margin, and staff productivity.
 - Compare performance across regions and support strategic business adjustments.
+
+<img width="1400" height="756" alt="image" src="https://github.com/user-attachments/assets/9fadcef4-782c-420c-8468-d22d9fd7179b" />
+
 
 ### 4️ KPI ASM Overview 
 - KPI results of each ASM by region for the month, based on total scores and specific performance metrics.
 - Evaluate and compare ASM performance to support ranking, rewards, or adjustments
 
-### 5️⃣ KPI ASM Overview 
+<img width="1391" height="781" alt="image" src="https://github.com/user-attachments/assets/3580feca-0672-498e-95b4-f584e1eebd72" />
+
+### 5️⃣ Top 10, Bot 10 Sale name
 - Top 10 and Bottom 10 sales staff based on total score, scale score, and financial score, analyzed by region and individual.
 - Identify top performers and underperformers to support performance evaluation and HR decisions.
 
-### 6️⃣ Comments
-- Analyze the financial performance of each region based on indicators such as income, expenses, profit, capital efficiency, and staff productivity.
-- Support regional comparison and enable strategic decision-making and business operation adjustments.
+<img width="1382" height="787" alt="image" src="https://github.com/user-attachments/assets/64ed44f5-5605-4182-9d89-3730eae19a84" />
 
 ### 7️⃣ Glossary
 - A glossary explaining terms, abbreviations, and codes used in the financial analysis system.
 - Assist users in understanding report content clearly and avoid confusion during data review and analysis.
 
+<img width="1398" height="755" alt="image" src="https://github.com/user-attachments/assets/ebdc4ac1-2f2f-4bb2-bdbf-a715e43c23dc" />
+
+## 📌 Conclusion
+
+Through this personal project, I not only enhanced my SQL Programming abilities but also gained practical experience in structuring, storing, and accessing data efficiently. Additionally, I became more familiar with data visualization by connecting to a database and utilizing Power BI to present insights. Most importantly, the project deepened my understanding of how data analysis can support business growth. It enabled me to communicate key insights clearly and effectively, especially to decision-makers and management teams.
+
+**As this is my first project, there may inevitably be some mistakes. I truly welcome any feedback or suggestions you may have—feel free to reach out to me at hoangsang19980702@gmail.com.**
 
