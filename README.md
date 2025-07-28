@@ -25,26 +25,29 @@ The objective is to develop a comprehensive regional business performance analys
 Financial_analysis_project/  
 │── **SQL Programming** 
 **Data Processing: Dbeaver + Postgresql**
-- Use Dbeaver to import into the database
- ###1️⃣  File fact_txn_month_raw_data
+ ### 1️⃣ Use Dbeaver to import into the database
+ 
+ File fact_txn_month_raw_data
 <img width="1443" height="615" alt="image" src="https://github.com/user-attachments/assets/328a7a07-5180-4645-978c-4c579ef34f79" />
 
- ###2️⃣  File fact_kpi_month_raw_data
+File fact_kpi_month_raw_data
 <img width="1327" height="599" alt="image" src="https://github.com/user-attachments/assets/c0e759c3-2ec7-48fd-9b7a-7cd3a9871e78" />
 
- ###2️⃣  File fact_kpi_asm
- <img width="1191" height="882" alt="image" src="https://github.com/user-attachments/assets/dfef0ba1-131d-4c33-ac3c-9580d9f8645a" />
+File fact_kpi_asm
+<img width="1191" height="882" alt="image" src="https://github.com/user-attachments/assets/dfef0ba1-131d-4c33-ac3c-9580d9f8645a" />
 
- ###2️⃣  Create dimension tables by using PostgreSQL Data Definition Language (DDL)
-  ###2️⃣Table dim_province: Information about cities in each zone area
+### 2️⃣ Create dimension tables by using PostgreSQL Data Definition Language (DDL)
+
+- Table dim_province: Information about cities in each zone area
 <img width="1474" height="615" alt="image" src="https://github.com/user-attachments/assets/d0ac8e9b-f1b2-4d53-a45e-8c8f00d4132d" /> 
 
- Table dim_report_item: Information about the criteria of the report table
+- Table dim_report_item: Information about the criteria of the report table
 <img width="1457" height="619" alt="image" src="https://github.com/user-attachments/assets/596d37c0-21a5-4946-8cbe-83f22ca3ce09" />
 
 - Use PL/SQL programming to create a report that runs for each month in 2023.
   
-#### By providing the YYYYMM parameter, the system can dynamically generate monthly reports by extracting relevant data from the fact tables and joining it with the pre-defined dimension tables. This automated process ensures consistency, reduces manual intervention, and allows for scalable reporting across different time periods with accurate and up-to-date information. View more Link: 
+- By providing the YYYYMM parameter, the system can dynamically generate monthly reports by extracting relevant data from the fact tables and joining it with the pre-defined dimension tables. This automated process ensures consistency, reduces manual intervention, and allows for scalable reporting across different time periods with accurate and up-to-date information. View more Link: 
+
 
 │── **Financial_analysis.pbix**: Power BI dashboard containing all visualizations and insights
 ### 1️⃣ Introduction
