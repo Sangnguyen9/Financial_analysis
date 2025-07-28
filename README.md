@@ -50,6 +50,7 @@ The objective is to develop a comprehensive regional business performance analys
 
 
 │── **Power BI**: Power BI dashboard containing all visualizations and insights
+
 **I connected Power BI to the PostgreSQL database using DirectQuery mode to retrieve and visualize the data, helping users gain a broader view of the report. [View more](Report_final.pdf)**
 
 ### 1️⃣ Introduction
