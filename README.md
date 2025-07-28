@@ -50,6 +50,8 @@ The objective is to develop a comprehensive regional business performance analys
 
 
 │── **Power BI**: Power BI dashboard containing all visualizations and insights
+**I connected Power BI to the PostgreSQL database using DirectQuery mode to retrieve and visualize the data, helping users gain a broader view of the report. [View more](Report_final.pdf)**
+
 ### 1️⃣ Introduction
 - Identified key customer segments and purchasing behavior.  
 - Analyzed regional sales performance to detect market trends.  
@@ -78,8 +80,4 @@ The objective is to develop a comprehensive regional business performance analys
 - A glossary explaining terms, abbreviations, and codes used in the financial analysis system.
 - Assist users in understanding report content clearly and avoid confusion during data review and analysis.
 
----  
----  
 
----  
-📌 **All insights and interactive charts can be accessed in `report.pbix`.**
