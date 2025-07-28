@@ -20,7 +20,7 @@ The objective is to develop a comprehensive regional business performance analys
 
 ## 📁 Project Structure  
 
-Financial_analysis_project/  
+## Sql_programming_project/  
 │── **SQL Programming** 
 **Data Processing: Dbeaver + Postgresql**
  ### 1️⃣ Use Dbeaver to import into the database
@@ -47,7 +47,7 @@ Financial_analysis_project/
 - By providing the YYYYMM parameter, the system can dynamically generate monthly reports by extracting relevant data from the fact tables and joining it with the pre-defined dimension tables. This automated process ensures consistency, reduces manual intervention, and allows for scalable reporting across different time periods with accurate and up-to-date information. View more Link: 
 
 
-│── **Financial_analysis.pbix**: Power BI dashboard containing all visualizations and insights
+│── **Power BI**: Power BI dashboard containing all visualizations and insights
 ### 1️⃣ Introduction
 - Identified key customer segments and purchasing behavior.  
 - Analyzed regional sales performance to detect market trends.  
@@ -75,14 +75,9 @@ Financial_analysis_project/
 ### 7️⃣ Glossary
 - A glossary explaining terms, abbreviations, and codes used in the financial analysis system.
 - Assist users in understanding report content clearly and avoid confusion during data review and analysis.
+
 ---  
 ---  
 
-## 🛠️ Tools Used  
-- **Power BI, SQL Programming (PostgreSQL)**
-- **Data Processing:** Stored procedures with monthly backdate execution
-- **Visualization:** Power BI charts  
-- **Statistical Analysis:** Descriptive statistics for trend evaluation  
-
 ---  
-📌 **All insights and interactive charts can be accessed in `Financial_analysis.pbix`.**
+📌 **All insights and interactive charts can be accessed in `report.pbix`.**
