@@ -44,7 +44,8 @@ The objective is to develop a comprehensive regional business performance analys
 
 - Use PL/SQL programming to create a report that runs for each month in 2023.
   
-- By providing the YYYYMM parameter, the system can dynamically generate monthly reports by extracting relevant data from the fact tables and joining it with the pre-defined dimension tables. This automated process ensures consistency, reduces manual intervention, and allows for scalable reporting across different time periods with accurate and up-to-date information. View more Link: (./final_code.sql)
+- By providing the YYYYMM parameter, the system can dynamically generate monthly reports by extracting relevant data from the fact tables and joining it with the pre-defined dimension tables. This automated process ensures consistency, reduces manual intervention, and allows for scalable reporting across different time periods with accurate and up-to-date information. View more: [final_code.sql](./final_code.sql)
+
 
 
 │── **Power BI**: Power BI dashboard containing all visualizations and insights
